@@ -1,0 +1,149 @@
+---
+editor_options:
+  chunk_output_type: console
+output:
+  word_document: default
+  html_document: default
+---
+###Module 5 - Assignment 1
+####Reyes, Marielli Nicole
+
+
+```{r}
+library(tidyverse)
+library(caret)
+library(nnet)
+```
+
+```{r}
+parole = read.csv("parole.csv")
+```
+
+```{r}
+parole = parole %>% mutate(male = as_factor(as.character(male))) %>% 
+  mutate(male = fct_recode(male,
+  "Male" = "1",
+  "Female" = "0"))
+
+parole = parole %>% mutate(race = as_factor(as.character(race))) %>% 
+  mutate(race = fct_recode(race,
+  "White" = "1",
+  "Otherwise" = "2"))
+
+parole = parole %>% mutate(state = as_factor(as.character(state))) %>% 
+  mutate(state = fct_recode(state,
+  "Any Other State" = "1",
+  "Kentucky" = "2",
+  "Louisiana" = "3",
+  "Virginia" = "4"))
+
+parole = parole %>% mutate(crime = as_factor(as.character(crime))) %>% 
+  mutate(crime = fct_recode(crime,
+  "Any Other Crime" = "1",
+  "Larceny" = "2",
+  "Drug-Related Crime" = "3",
+  "Driving-Related Crime" = "4"))
+
+parole = parole %>% 
+  mutate(multiple.offenses = as.factor(as.character(multiple.offenses))) %>% 
+  mutate(multiple.offenses = fct_recode(multiple.offenses,
+  "Multiple Offenses" = "1",
+  "Otherwise" = "0"))
+
+parole = parole %>% mutate(violator = as.factor(as.character(violator))) %>% 
+  mutate(violator = fct_recode(violator,
+  "With Violation" = "1",
+  "Without Violation" = "0"))
+```
+
+
+```{r}
+set.seed(12345)
+train.rows = createDataPartition(y = parole$violator, p=0.7, list = FALSE)
+train = parole[train.rows,] 
+test = parole[-train.rows,]
+```
+
+```{r}
+fitControl = trainControl(method = "cv", 
+                           number = 10)
+
+nnetGrid <-  expand.grid(size = 12, decay = 0.1)
+
+set.seed(1234)
+nnetBasic = train(violator ~ ., 
+                 parole,
+                 method = "nnet",
+                 tuneGrid = nnetGrid,
+                 trControl = fitControl,
+                 verbose = FALSE,
+                 trace = FALSE)
+```
+
+
+Predictions on the training set were developed using the nnetBasic model. 
+```{r}
+predNetBasic_train = predict(nnetBasic, train)
+head(predNetBasic_train)
+```
+
+The accuracy value generated is 0.93, while sensitivity is 0.56 and specificity is 0.98. 
+```{r}
+confusionMatrix(predNetBasic_train, train$violator, positive = "With Violation")
+```
+
+
+```{r}
+fitControl = trainControl(method = "cv", 
+                           number = 10)
+
+nnetGrid2 =  expand.grid(size = seq(from = 1, to = 12, by = 1), 
+                        decay = seq(from = 0.1, to = 0.5, by = 0.1))
+set.seed(1234)
+nnetFit = train(violator ~ ., 
+                 parole,
+                 method = "nnet",
+                 trControl = fitControl,
+                 tuneGrid = nnetGrid2,
+                 verbose = FALSE,
+                 trace = FALSE)
+```
+
+
+Predictions were developed on the training set using the nnetFit model. 
+```{r}
+predNet_train = predict(nnetFit, train)
+head(predNet_train)
+```
+
+The resulting accuracy is 0.90, sensitivity is 0.27 and specificity is 0.98. The accuracy value generated on the training set using the nnetFit model is lower compared to the accuracy value generated on the training set using the nnetBasic model. 
+```{r}
+confusionMatrix(predNet_train, train$violator, positive = "With Violation")
+```
+
+
+Predictions on the testing set were developed using the nnetBasic model. 
+```{r}
+predNetBasic_test = predict(nnetBasic, test)
+head(predNetBasic_test)
+```
+
+
+The accuracy, sensitivity and specificity values generated were 0.92, 0.30 and 0.99, respectively. The accuracy value for the testing set using the nnetBasic model is lower compared to the training set. However, this is to be expected and the difference in value is not sufficient to conclude that there is overfitting. 
+```{r}
+confusionMatrix(predNetBasic_test, test$violator, positive = "With Violation")
+```
+
+
+Predictions on the testing set were developed using the nnetFit model. 
+```{r}
+predNet_test = predict(nnetFit, test)
+head(predNet_test)
+```
+
+
+Accuracy for the testing set using the nnetFit model is 0.90, sensitivity is 0.13 and specificity is 0.99. The accuracy value for the training and testing sets are similar; the model performed well even on the testing set. This suggests that there is no overfitting.
+```{r}
+confusionMatrix(predNet_test, test$violator, positive = "With Violation")
+```
+

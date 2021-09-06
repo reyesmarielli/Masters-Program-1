@@ -1,0 +1,126 @@
+---
+editor_options:
+  chunk_output_type: console
+output:
+  word_document: default
+  html_document: default
+---
+###Module 3 - Assignment 1
+####Reyes, Marielli Nicole
+
+
+```{r}
+library(tidyverse)
+library(MASS)
+library(caret)
+```
+
+```{r}
+bike = read.csv("hour.csv")
+```
+
+```{r}
+bike = bike %>% mutate(season = as_factor(as.character(season))) %>%
+  mutate(season = fct_recode(season,
+  "Spring" = "1",
+  "Summer" = "2",
+  "Fall" = "3",
+  "Winter" = "4"))
+
+bike = bike %>% mutate(yr = as_factor(as.character(yr))) 
+bike = bike %>% mutate(mnth = as_factor(as.character(mnth))) 
+bike = bike %>% mutate(hr = as_factor(as.character(hr))) 
+
+bike = bike %>% mutate(holiday = as_factor(as.character(holiday))) %>%
+  mutate(holiday = fct_recode(holiday,
+  "NotHoliday" = "0",
+  "Holiday" = "1"))
+
+bike = bike %>% mutate(workingday = as_factor(as.character(workingday))) %>%
+  mutate(workingday = fct_recode(workingday,
+  "NotWorkingDay" = "0",
+  "WorkingDay" = "1"))
+
+bike = bike %>% mutate(weathersit = as_factor(as.character(weathersit))) %>%
+  mutate(weathersit = fct_recode(weathersit,
+  "NoPrecip" = "1",
+  "Misty" = "2",
+  "LightPrecip" = "3",
+  "HeavyPrecip" = "4"))
+
+bike = bike %>% mutate(weekday = as_factor(as.character(weekday))) %>%
+  mutate(weekday = fct_recode(weekday,
+  "Sunday" = "0",
+  "Monday" = "1",
+  "Tuesday" = "2",
+  "Wednesday" = "3",
+  "Thursday" = "4",
+  "Friday" = "5",
+  "Satuday" = "6"))
+```
+
+
+```{r}
+set.seed(1234)
+train.rows = createDataPartition(y = bike$count, p=0.7, list = FALSE)
+train = bike[train.rows,] 
+test = bike[-train.rows,]
+```
+
+
+
+Training set has 12,167 rows and test set has 5,212 rows. 
+
+```{r}
+str(train)
+str(test)
+```
+
+
+
+The model shows that the p-values of the variables are significant; some levels of the dummy variables are also significant. Further, the adjusted r-squared value of 0.6214 is good. Intuitively, there is a higher count of rentals when the weather and temperature is good. Also, there are certain hours of the day when bike rentals are at its peak. Season and month also has an effect on the response variable as there are more rentals during the Fall compared to other seasons or months. These claims are well represented by the coefficients of the variables in the model. 
+
+```{r}
+mod1 = lm(count ~ season+mnth+hr+holiday+weekday+temp+weathersit, train) 
+summary(mod1)
+```
+
+
+
+The values below show the first six probabilities for the count variable. In the model, the variables season, month, hour, holiday, weekday, temperature, and weather situation were used to predict bike rental count. The predictions show negative values for the first five values then later on generated a positive value. 
+
+```{r}
+predict_train = predict(mod1, train)
+head(predict_train)
+```
+
+
+
+The first six predictions on the testing set generated relatively bigger positive values compared to the predictions on the training set. 
+
+```{r}
+predict_test = predict(mod1, newdata = test)
+head(predict_test)
+```
+
+
+The r-squared value that was generated from the test set is close to the training data model. This shows that there is no overfitting and the model that was created from the training set will likely perform well with new data. 
+
+```{r}
+SSE = sum((test$count - predict_test)^2) 
+SST = sum((test$count - mean(test$count))^2)
+1 - SSE/SST 
+```
+
+With regards to k-fold cross-validation it differs from training/testing split because the whole dataset will be used for the model validation. For this particular assignment, the entire dataset bike was used and data was not split into training/testing. Further, for this instance, a 10-fold cross validation was done on the dataset. The data was split into 10 folds and the data was evaluated 10 times while holding out 1 fold. The results show that the model performance is similar to the model from the training/testing split. The adjusted R-squared value of 0.6232 generated from k-fold cross-validation is close to the R-squared value generated from the training/testing split. The p-values of the variables show that they are significant and some levels of the dummy variables are also significant. 
+
+```{r}
+ctrl = trainControl(method = "cv",number = 10) 
+
+set.seed(1234)
+modCV = train(count ~ season+mnth+hr+holiday+weekday+temp+weathersit, bike, method = "lm", trControl = ctrl, metric="Rsquared")
+summary(modCV)
+```
+
+
+

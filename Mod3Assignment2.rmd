@@ -1,0 +1,281 @@
+---
+editor_options:
+  chunk_output_type: console
+output:
+  word_document: default
+  html_document: default
+---
+###Module 3 - Assignment 2
+####Reyes, Marielli Nicole
+
+
+```{r}
+library(tidyverse)
+library(MASS)
+library(caret)
+library(ROCR)
+```
+
+
+```{r}
+parole = read.csv("parole.csv")
+```
+
+
+```{r}
+parole = parole %>% mutate(male = as_factor(as.character(male))) %>% 
+  mutate(male = fct_recode(male,
+  "Male" = "1",
+  "Female" = "0"))
+```
+
+
+```{r}
+parole = parole %>% mutate(race = as_factor(as.character(race))) %>% 
+  mutate(race = fct_recode(race,
+  "White" = "1",
+  "Otherwise" = "2"))
+```
+
+
+```{r}
+parole = parole %>% mutate(state = as_factor(as.character(state))) %>% 
+  mutate(state = fct_recode(state,
+  "Any Other State" = "1",
+  "Kentucky" = "2",
+  "Louisiana" = "3",
+  "Virginia" = "4"))
+```
+
+
+```{r}
+parole = parole %>% mutate(crime = as_factor(as.character(crime))) %>% 
+  mutate(crime = fct_recode(crime,
+  "Any Other Crime" = "1",
+  "Larceny" = "2",
+  "Drug-Related Crime" = "3",
+  "Driving-Related Crime" = "4"))
+```
+
+
+```{r}
+parole = parole %>% 
+  mutate(multiple.offenses = as.factor(as.character(multiple.offenses))) %>% 
+  mutate(multiple.offenses = fct_recode(multiple.offenses,
+  "Multiple Offenses" = "1",
+  "Otherwise" = "0"))
+```
+
+
+```{r}
+parole = parole %>% mutate(violator = as.factor(as.character(violator))) %>% 
+  mutate(violator = fct_recode(violator,
+  "With Violation" = "1",
+  "Without Violation" = "0"))
+```
+
+
+```{r}
+set.seed(12345)
+train.rows = createDataPartition(y = parole$violator, p=0.7, list = FALSE)
+train = parole[train.rows,] 
+test = parole[-train.rows,]
+```
+
+
+There is only a small difference between male and female total count. The gender of the parolee, on its own, is not sufficient to predict if the parolee would violate his or her parole. 
+```{r}
+ggplot(parole,aes(x=male,fill=violator)) + 
+  geom_bar(position="fill") + theme_bw()
+
+t1 = table(parole$violator,parole$male)
+prop.table(t1, margin = 2)
+```
+
+
+The barplot shows that 90% of the parolees whose race was white completed their parole without violation, compared to 87% of other races. There is only a small difference between the two so the variable may not be enough on its own to predict the response variable. 
+```{r}
+ggplot(parole,aes(x=race,fill=violator)) + 
+  geom_bar(position="fill") + theme_bw()
+
+t2 = table(parole$violator,parole$race)
+prop.table(t2, margin = 2)
+```
+
+
+The boxplot shows that older parolees seem to complete their paroles more without violation compared to younger parolees. 
+```{r}
+ggplot(parole,aes(x=violator,y=age)) + 
+  geom_boxplot()
+```
+
+
+The barplot shows that there is a significant difference between the states. Parolees from Louisiana have a lesser number of parolees who completed their paroles without violation. Examining the table reveal that only 55% from Louisiana completed their paroles without violation compared to 88% of Kentucky, 98% of Virginia, and 86% of other states. This variable appear to be a good predictor of the response variable. 
+```{r}
+ggplot(parole,aes(x=state,fill=violator)) + 
+  geom_bar(position="fill") + theme_bw()
+
+t3 = table(parole$violator,parole$state)
+prop.table(t3, margin = 2)
+```
+
+
+Although the boxplot demonstrates that there might be some outliers in the data, overall it shows that parolees who served more time in prison completed their paroles more without violation.  
+```{r}
+ggplot(parole,aes(x=violator,y=time.served)) + 
+  geom_boxplot()
+```
+
+
+Outliers are present in the data; however, it can still be seen clearly in the boxplot that parolees who received longer sentences had a higher number of parole completion without violation. 
+```{r}
+ggplot(parole,aes(x=violator,y=max.sentence)) + 
+  geom_boxplot()
+```
+
+
+The parolees who were incarcerated for multiple offenses completed less of their paroles without violation. Examining the figures show that only 85% of parolees with multiple offenses completed their parole without violation compared to 92% of parolees without multiple offenses. This variable is another strong indicator of the response variable. 
+```{r}
+ggplot(parole,aes(x=multiple.offenses,fill=violator)) + 
+  geom_bar(position="fill") + theme_bw()
+
+t4 = table(parole$violator,parole$multiple.offenses)
+prop.table(t4, margin = 2)
+```
+
+
+The barplot shows that there are more parolees who completed their parole without violation if their crime were driving-related. 93% of the parolees with driving-related crimes completed their parole without violation compared to 88% of parolees with drug-related crimes, larceny, or other charges. 
+```{r}
+ggplot(parole,aes(x=crime,fill=violator)) + 
+  geom_bar(position="fill") + theme_bw()
+
+t5 = table(parole$violator,parole$crime)
+prop.table(t5, margin = 2)
+```
+
+
+Intuitively, the parolees with multiple offenses have a higher chance of violating their parole compared to other parolees. The p-values from the model appear to be significant and the AIC value generated is 479.81. This may be compared to other models. 
+```{r}
+mod1 = glm(violator ~ multiple.offenses, parole, family = "binomial")
+summary(mod1)
+```
+
+
+The initial AIC generated from the empty model is 342.04 and allmod is 256.16. 
+```{r}
+allmod = glm(violator ~ ., train, family = "binomial") 
+summary(allmod)  
+  
+emptymod = glm(violator~1, train, family = "binomial")  
+summary(emptymod)
+```
+
+
+The AIC generated from the backward stepwise (252.28) model is smaller than the original AIC from allmod (256.16). The variables that were included in the model are race, age, state, max.sentence, and multiple.offenses. Of the variables, race, state (specifically Virginia), and multiple.offenses were significant given their p-values being less than 0.05; they are considered good predictors of whether a parolee will violate his or her parole. This makes perfect sense since intuitively, parolees with multiple offenses have a higher chance of violating their paroles compared to other parolees, as supported by the positive coefficient. Further, as shown earlier in the barplots, 98% of parolees from Virginia completed their paroles without violation compared to other states, which explains the negative coefficient in the variable. There is a lower chance that a parolee will violate his or her parole if they are from Virginia. Lastly, it was also demonstrated in the boxplot earlier that parolees who were not white had more parole violations compared to parolees who were white. Thus, this explains the positive coefficient for the variable. If a parolee is not white, there is a higher chance that he or she will violate his or parole. 
+```{r}
+backmod = stepAIC(allmod, direction = "backward", trace = TRUE) 
+summary(backmod)
+```
+
+
+The forward stepwise generated the same results. Both the models are the same. The AIC and the variables included in the model are similar. It may also be noted that the AIC generated from the forward stepwise approach is smaller than the original empty model AIC.
+```{r}
+forwardmod = stepAIC(emptymod, direction = "forward", scope=list(upper=allmod,lower=emptymod), trace = TRUE) 
+summary(forwardmod) 
+```
+
+
+The variables state (specifically Virginia), multiple.offenses, and race are all significant given their p-values of less than .05. The AIC generated is comparable to the AIC values from the backward and forward models. This model further support previous claims.
+```{r}
+mod2 = glm(violator ~ state+multiple.offenses+race, train, family = "binomial")
+summary(mod2)
+```
+
+
+On one hand, if Parolee1 is from Louisiana, has multiple offenses, and is white, the predicted probability of parole violation is 0.42.
+```{r}
+newdata = data.frame(state = "Louisiana", multiple.offenses = "Multiple Offenses", race = "White")
+predict(mod2, newdata, type="response")
+```
+
+
+On the other hand, if Parolee2 is from Kentucky, with no multiple offenses, and is not white, the predicted probability of parole violation is 0.12. 
+```{r}
+newdata2 = data.frame(state = "Kentucky", multiple.offenses = "Otherwise", race = "Otherwise")
+predict(mod2, newdata2, type="response")
+```
+
+
+```{r}
+mod3 = glm(violator~., data=train, family="binomial")
+```
+
+
+The following show the first six predictions for violator variable. 
+```{r}
+predictions = predict(mod3, train, type="response")
+head(predictions)
+```
+
+
+Below is the ROC Curve:
+```{r}
+ROCRpred = prediction(predictions, train$violator) 
+
+
+ROCRperf = performance(ROCRpred, "tpr", "fpr")
+plot(ROCRperf, colorize=TRUE, print.cutoffs.at=seq(0,1,by=0.1), text.adj=c(-0.2,1.7))
+```
+
+
+The area under the curve or AUC is 0.12. 
+```{r}
+as.numeric(performance(ROCRpred, "auc")@y.values)
+```
+
+
+The cutoff is 0.01. The sensitivity is 0.84 while specificity is 0.02.  
+```{r}
+opt.cut = function(perf, pred){
+    cut.ind = mapply(FUN=function(x, y, p){
+        d = (x - 0)^2 + (y-1)^2
+        ind = which(d == min(d))
+        c(sensitivity = y[[ind]], specificity = 1-x[[ind]], 
+            cutoff = p[[ind]])
+    }, perf@x.values, perf@y.values, pred@cutoffs)
+}
+print(opt.cut(ROCRperf, ROCRpred))
+```
+
+
+Since the cutoff is 0.012, accuracy is computed as 0.26.
+```{r}
+t1 = table(train$violator,predictions > 0.01166761)
+t1
+
+(t1[1,1]+t1[2,2])/nrow(train)
+```
+
+
+It is important for the model to be accurate so that the right prisoner, who will not do any violations, may be given a chance to be granted parole. If a parolee was incorrectly classified, it will be a liability to the parole officers and there would also be a security issue for the general public. 
+
+To maximize accuracy on the training set, a probability threshold of 0.5 was identified via trial-and-error. This generated an accuracy value of 0.90.
+```{r}
+t1 = table(train$violator,predictions > 0.5)
+t1
+
+(t1[1,1]+t1[2,2])/nrow(train)
+```
+
+
+Using the same probability threshold of 0.5 to determine accuracy of the model on the testing set, an accuracy value of 0.89 was generated. 
+```{r}
+predictions2 = predict(mod3, test, type="response")
+
+
+t2 = table(test$violator,predictions2 > 0.5)
+t2
+
+(t2[1,1]+t2[2,2])/nrow(test)
+```
+

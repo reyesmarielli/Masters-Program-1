@@ -1,0 +1,169 @@
+---
+editor_options:
+  chunk_output_type: console
+output:
+  word_document: default
+  html_document: default
+---
+###Module 4 - Assignment 1
+####Reyes, Marielli Nicole
+
+```{r}
+library(tidyverse)
+library(caret)
+library(rpart)
+library(rattle)
+library(RColorBrewer)
+```
+
+```{r}
+parole = read.csv("parole.csv")
+```
+
+```{r}
+parole = parole %>% mutate(male = as_factor(as.character(male))) %>% 
+  mutate(male = fct_recode(male,
+  "Male" = "1",
+  "Female" = "0"))
+
+parole = parole %>% mutate(race = as_factor(as.character(race))) %>% 
+  mutate(race = fct_recode(race,
+  "White" = "1",
+  "Otherwise" = "2"))
+
+parole = parole %>% mutate(state = as_factor(as.character(state))) %>% 
+  mutate(state = fct_recode(state,
+  "Any Other State" = "1",
+  "Kentucky" = "2",
+  "Louisiana" = "3",
+  "Virginia" = "4"))
+
+parole = parole %>% mutate(crime = as_factor(as.character(crime))) %>% 
+  mutate(crime = fct_recode(crime,
+  "Any Other Crime" = "1",
+  "Larceny" = "2",
+  "Drug-Related Crime" = "3",
+  "Driving-Related Crime" = "4"))
+
+parole = parole %>% 
+  mutate(multiple.offenses = as.factor(as.character(multiple.offenses))) %>% 
+  mutate(multiple.offenses = fct_recode(multiple.offenses,
+  "Multiple Offenses" = "1",
+  "Otherwise" = "0"))
+
+parole = parole %>% mutate(violator = as.factor(as.character(violator))) %>% 
+  mutate(violator = fct_recode(violator,
+  "With Violation" = "1",
+  "Without Violation" = "0"))
+```
+
+```{r}
+set.seed(12345)
+train.rows = createDataPartition(y = parole$violator, p=0.7, list = FALSE)
+train = parole[train.rows,] 
+test = parole[-train.rows,]
+```
+
+
+A 40 year-old parolee from Louisiana who served a 5 year prison sentence will be classified under the parolees who completed the parole without violation. Starting from the top of the three, we are given a choice as to whether the parolee is from Kentucky, Virginia or Any Other State. Since he or she is from Louisiana, we are going to take a right. The next split is whether the parolee's age is less than 43. Given that he or she is 40 years old, we are going to turn left. This would bring us to the last split which is the time served. The parolee's time served is greater than 2.5 so this would lead us to decide that he or she would complete his or her parole without violation. 
+```{r}
+tree1 = rpart(violator ~., train, method="class")
+fancyRpartPlot(tree1)
+```
+
+
+The complexity parameter value of 0.05 must be chosen as this would lead to a lower cross-validated error value and will give balance between over and under-fitting. 
+```{r}
+printcp(tree1)
+plotcp(tree1)
+```
+
+
+The "Without Violation" class for the violator variable has the most number of observations.
+```{r}
+tree2 = prune(tree1,cp= tree1$cptable[which.min(tree1$cptable[,"xerror"]),"CP"])
+```
+
+
+```{r}
+predictions_train = predict(tree1, train, type = "class")
+head(predictions_train)
+```
+
+
+The resulting accuracy for the training set is 90.7% while the no information rate is 88.37%. The results also show that sensitivity is 49.09% and specificity is 96.17%. 
+```{r}
+confusionMatrix(predictions_train,train$violator,positive="With Violation") 
+```
+
+
+```{r}
+predictions_test = predict(tree1, test, type = "class")
+head(predictions_test)
+```
+
+
+Accuracy for the testing set is 86.14% which is lower than the accuracy for the training set which is 90.7%. The difference, however, is minimal so this suggest that there is no overfitting. The no information rate value is 88.61% while sensitivity and specificity are 17.39% and 94.97% respectively. 
+```{r}
+confusionMatrix(predictions_test,test$violator,positive="With Violation")
+```
+
+
+```{r}
+blood = read.csv("Blood.csv")
+```
+
+
+```{r}
+blood = blood %>% mutate(DonatedMarch = as_factor(as.character(DonatedMarch))) %>% 
+  mutate(DonatedMarch = fct_recode(DonatedMarch,
+  "Yes" = "1",
+  "No" = "0"))
+```
+
+```{r}
+set.seed(1234)
+train.rows2 = createDataPartition(y = blood$DonatedMarch, p=0.7, list = FALSE)
+train2 = blood[train.rows2,] 
+test2 = blood[-train.rows2,]
+```
+
+```{r}
+tree3 = rpart(DonatedMarch ~., train2, method="class")
+fancyRpartPlot(tree3)
+```
+
+
+The CP value that must be chosen is 0.016 since this leads to a lower error value. 
+```{r}
+printcp(tree3)
+plotcp(tree3)
+```
+
+Tree was pruned back to optimal CP value. 
+```{r}
+tree4 = prune(tree3,cp= tree3$cptable[which.min(tree3$cptable[,"xerror"]),"CP"])
+```
+
+
+Using the pruned tree, predictions on the training set were implemented. The results show that accuracy is 81.3%, sensitivity is 46.4% and specificity is 92.23%. 
+```{r}
+predictions_train2 = predict(tree4, train2, type = "class")
+head(predictions_train2)
+```
+
+```{r}
+confusionMatrix(predictions_train2,train2$DonatedMarch,positive="Yes") 
+```
+
+
+Using the pruned tree for predictions on the testing set yield accuracy, sensitivity and specificity values of 75.45%, 26.42% and 90.64%, respectively. There is a considerable difference between the accuracy values on the training and testing set.
+```{r}
+predictions_test2 = predict(tree4, test2, type = "class")
+head(predictions_test2)
+```
+
+```{r}
+confusionMatrix(predictions_test2,test2$DonatedMarch,positive="Yes")
+```
+

@@ -1,0 +1,147 @@
+---
+editor_options:
+  chunk_output_type: console
+output:
+  word_document: default
+  html_document: default
+---
+##Correlation and Simple Linear Regression Assignment
+###Reyes, Marielli Nicole
+###01/30/2019
+
+
+```{r}
+library(tidyverse)
+library(GGally)
+```
+
+
+####For this assignment, the airquality dataset will be used. 
+
+a. The air dataframe contains the measurements of the quality of air in New York in a span of 4 months, from May 1973 to September 1973. The dataframe has 6 columns and 153 rows, and the variables in the dataset are Ozone, Solar.R, Wind, Temp, Month, and Day.
+```{r}
+air = airquality
+ncol(air)
+nrow(air)
+```
+
+
+b. The dataset contains 6 variables with a total of 153 observations.
+```{r}
+str(air)
+```
+
+
+c. There are some missing data in two of the variables, Ozone and Solar.R.
+```{r}
+summary(air)
+```
+
+
+d. The Ozone variable is likely to be the response (Y) variable.
+```{r}
+ggpairs(air)
+```
+
+
+
+####Since there are some missing data, the rows containing NA values were deleted and a new dataframe called air2 was created. 
+```{r}
+air2 = air %>% filter(!is.na(Ozone)) %>% filter(!is.na(Solar.R))
+```
+
+Air2 has 6 variables and 111 observations (6 columns and 111 rows).
+```{r}
+str(air2)
+nrow(air2)
+ncol(air2)
+```
+
+
+####Visualization and Correlation
+```{r}
+ggpairs(air2)
+ggcorr(air2, label = TRUE)
+```
+
+a. The Temp variable is most strongly correlated with the Ozone variable.
+b. The Day variable is least strongly correlated with the Ozone variable.
+
+
+####Temperature vs. Ozone
+
+The scatterplot shows that there seems to be a linear relationship between Temp and Ozone. There is an intuitive increase in ozone level as temperature increases. 
+
+```{r}
+ggplot(air2, aes(x=Temp,y=Ozone))+
+  geom_point()
+```
+
+
+
+####Linear Regression Model for Temp and Ozone
+
+```{r}
+model1 = lm(Ozone ~ Temp, air2) 
+summary(model1)
+```
+a. The results show that the R-squared value of 0.488 is good and the Temp variable is significant, with p value significantly less than .05. 
+
+
+b. The coefficient for the slope will likely fall in the 1.96 to 2.91 range.
+```{r}
+confint(model1)
+```
+
+
+####Regression Line
+```{r}
+ggplot(air2, aes(x=Temp,y=Ozone))+
+  geom_point()+
+  geom_smooth(method = "lm", se = FALSE, color = "red")+ 
+  theme_bw()
+```
+
+
+####Prediction Interval
+```{r}
+#Prediction for Ozone when Temp is 80. 
+predict(model1,data.frame("Temp"=80), interval="predict")
+temp_var = predict(model1, interval = "prediction")
+new_df = cbind(air2, temp_var)
+head(new_df)
+```
+
+
+
+####Day vs. Ozone
+```{r}
+ggplot(air2, aes(x=Day,y=Ozone))+
+  geom_point()
+```
+
+Day and Ozone does not seem to have a linear relationship. 
+
+
+####Linear Regression Model for Day and Ozone
+```{r}
+model2 = lm(Ozone ~ Day, air2) 
+summary(model2)
+```
+a. The R-squared value is almost 0 which denotes that it is not significant and the p-value for Day is more than 0.05, which means that it also not significant. 
+
+
+b. The slope coefficient will likely fall in the -0.75 to 0.71 range. 
+```{r}
+confint(model2)
+```
+
+
+####Regression Line
+```{r}
+ggplot(air2, aes(x=Day,y=Ozone))+
+  geom_point()+
+  geom_smooth(method = "lm", se = FALSE, color = "red")+ 
+  theme_bw()
+```
+

@@ -1,0 +1,160 @@
+---
+editor_options:
+  chunk_output_type: console
+output:
+  word_document: default
+  html_document: default
+---
+##Correlation and Simple Linear Regression Assignment 2
+###Reyes, Marielli Nicole
+###02/04/2019
+
+```{r}
+library(tidyverse)
+library(GGally)
+library(MASS)
+library(leaps)
+```
+
+
+Data frame bike will be used for this assignment and variable conversions were made. Variables such as "yr", "mnth", and "hr" were converted into factors because this is R's way of representing categorical data. By using factors, categorical data may be ordered or unordered. 
+```{r}
+bike = read.csv("hour.csv")
+```
+
+```{r}
+bike = bike %>% mutate(season = as_factor(as.character(season))) %>%
+  mutate(season = fct_recode(season,
+  "Spring" = "1",
+  "Summer" = "2",
+  "Fall" = "3",
+  "Winter" = "4"))
+```
+
+```{r}
+bike = bike %>% mutate(yr = as_factor(as.character(yr))) 
+bike = bike %>% mutate(mnth = as_factor(as.character(mnth))) 
+bike = bike %>% mutate(hr = as_factor(as.character(hr))) 
+```
+
+
+```{r}
+bike = bike %>% mutate(holiday = as_factor(as.character(holiday))) %>%
+  mutate(holiday = fct_recode(holiday,
+  "NotHoliday" = "0",
+  "Holiday" = "1"))
+```
+
+```{r}
+bike = bike %>% mutate(workingday = as_factor(as.character(workingday))) %>%
+  mutate(workingday = fct_recode(workingday,
+  "NotWorkingDay" = "0",
+  "WorkingDay" = "1"))
+```
+
+```{r}
+bike = bike %>% mutate(weathersit = as_factor(as.character(weathersit))) %>%
+  mutate(weathersit = fct_recode(weathersit,
+  "NoPrecip" = "1",
+  "Misty" = "2",
+  "LightPrecip" = "3",
+  "HeavyPrecip" = "4"))
+```
+
+```{r}
+bike = bike %>% mutate(weekday = as_factor(as.character(weekday))) %>%
+  mutate(weekday = fct_recode(weekday,
+  "Sunday" = "0",
+  "Monday" = "1",
+  "Tuesday" = "2",
+  "Wednesday" = "3",
+  "Thursday" = "4",
+  "Friday" = "5",
+  "Satuday" = "6"))
+```
+
+
+Out of all the quantitative variables, Temp appears to be best correlated with count.
+```{r}
+ggpairs(bike, columns = c("instant","temp","atemp","hum","windspeed","count"))
+```
+
+
+```{r}
+#The boxplot shows that seasons have an effect on count. The average number of rentals (count) are higher during Fall and Summer compared to other seasons.
+ggplot(bike,aes(x=season,y=count)) + geom_boxplot()
+
+#The image below shows that the mean of bike rentals increased during the two year time span. Yr shows that there is an increasing trend with regards to bike rentals.
+ggplot(bike,aes(x=yr,y=count)) + geom_boxplot()
+
+#The month boxplot further supports the result shown earlier with regards to season - there are more rentals during the Summer and Fall months. Month clearly has an effect on the count variable.
+ggplot(bike,aes(x=mnth,y=count)) + geom_boxplot()
+
+#Furhter, the hr variable significantly affects the count variable as shown below - there are more demand for bike rentals during certain hours of the day such as 8am and 5 to 6pm.
+ggplot(bike,aes(x=hr,y=count)) + geom_boxplot()
+
+#It can be seen that holidays also have an effect on count. There are lesser bike rentals during holidays compared to non-holidays, which signals that the rentals may not be for recreational use. 
+ggplot(bike,aes(x=holiday,y=count)) + geom_boxplot()
+
+#The boxplot shows that the mean for count during Fridays is higher compared to other days. There is an increasing trend on rentals during the work week and a decreasing one on weekends. 
+ggplot(bike,aes(x=weekday,y=count)) + geom_boxplot()
+
+#The diagram clearly shows that workingday has an impact on count. There are more rentals when it is a working day. 
+ggplot(bike,aes(x=workingday,y=count)) + geom_boxplot()
+
+#Weather greatly affects count. Intuitively, there is a decrease in bike rentals when the weather is bad. 
+ggplot(bike,aes(x=weathersit,y=count)) + geom_boxplot()
+
+```
+
+```{r}
+bike2 = bike %>% dplyr::select(-c(instant, dteday, registered, casual)) 
+```
+
+```{r}
+allmod = lm(count ~., bike2)
+summary(allmod)
+
+emptymod = lm(count ~1, bike2)
+summary(emptymod)
+```
+
+For the forward model, the hr, atemp, yr, weathersit, season, mnth, hum, weekday, holiday, windspeed, and temp variables were included. The p-values are all significant and some levels of the dummy variables are also significant. Further, the r-squared value is also strong. The model support the initial claim. Intuitively, the hr of the day, the season, the weather, temperature and whether it is a working day or not greatly affect the number of bike rentals.
+```{r}
+forwardmod = stepAIC(emptymod, direction = "forward",   
+    scope=list(upper=allmod,lower=emptymod),
+    trace = TRUE)
+
+summary(forwardmod)
+```
+
+For the backward model, the season, yr, mnth, hr, holiday, weekday, weathersit, temp, atemp, hum, and windspeed variables were included. These are the same variables as the forward model. Thus, backward yields the same model. The p-values are all significant and some levels of the dummy variables are also significant.
+```{r}
+backmod = stepAIC(allmod, direction = "backward", trace = TRUE)
+
+summary(backmod)
+
+#It can be noted that the value for the workingday variable was listed as NA. This is because workingday is perfectly correlated with another variable in the model. The weekday and holiday variables represent workingday in the model. The weekday and holiday variables can already tell if the observation was recorded on a weekday or holiday (working day or not working day).
+```
+
+```{r}
+bike3 = bike2 %>% mutate(yr = as.integer(yr)-1)
+```
+
+```{r}
+allmod2 = lm(count ~., bike3)
+summary(allmod2)
+
+emptymod2 = lm(count ~1, bike3)
+summary(emptymod2)
+```
+
+By converting yr to an integer so that the model may be used in future years, the forward stepwise model that was created from the conversion yielded the same results as the forward model that was created prior to the conversion. 11 variables (hr, atemp, yr, weathersit, season, mnth, hum, weekday, holiday, windspeed, temp) are still included in the model. The p-values and r-squared values are also significant. 
+```{r}
+forwardmod2 = stepAIC(emptymod2, direction = "forward",   
+    scope=list(upper=allmod2,lower=emptymod2),
+    trace = TRUE)
+
+summary(forwardmod2)
+```
+

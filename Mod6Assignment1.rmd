@@ -1,0 +1,136 @@
+---
+editor_options:
+  chunk_output_type: console
+output:
+  word_document: default
+  html_document: default
+---
+###Module 6 - Assignment 1
+####Reyes, Marielli Nicole
+
+
+```{r}
+library(tidyverse)
+library(cluster)
+library(factoextra)
+library(dendextend)
+```
+
+
+```{r}
+trucks = read.csv("trucks.csv")
+```
+
+
+There is no missingness in the data. 
+```{r}
+str(trucks)
+summary(trucks)
+```
+
+
+There is a natural clustering of drivers. The plot shows that there seems to be three separate groups. 
+```{r}
+ggplot(aes(x=Distance,y=Speeding),data=trucks)+
+  geom_point()
+```
+
+
+```{r}
+trucks2 = trucks %>% select("Distance","Speeding")
+head(trucks2)
+```
+
+```{r}
+trucks2 = as.data.frame(scale(trucks2))
+head(trucks2)
+```
+
+```{r}
+set.seed(1234)
+clusters1 <- kmeans(trucks2, 2)
+```
+
+There appears to be two separate groups, and cluster 1 is relatively bigger than cluster 2. 
+```{r}
+fviz_cluster(clusters1, trucks2)
+```
+
+It can be seen that at cluster 4, it starts to flatten out. 
+```{r}
+set.seed(123)
+fviz_nbclust(trucks2, kmeans, method = "wss")
+```
+
+The optimal number of clusters with the max method is 4. Hence, there is a consensus between the methods as the optimal number of clusters, which is 4. 
+```{r}
+set.seed(123)
+fviz_nbclust(trucks2, kmeans, method = "silhouette")
+```
+
+The results show that there are four separate groups. The purple (cluster 4) and green clusters (cluster 2) overlap in some areas. Also, the blue cluster occupies the biggest area compared to other clusters. The 3rd cluster (blue) appears to be made up of drivers whose average mileage per day is bigger than the rest and who also appears to be speeding more compared to other drivers.
+```{r}
+set.seed(1234)
+clusters2 <- kmeans(trucks2, 4)
+fviz_cluster(clusters2, trucks2)
+```
+
+
+There is no missingness in the dataset.
+```{r}
+wine = read.csv("wineprice.csv")
+str(wine)
+summary(wine)
+```
+
+```{r}
+wine2 = wine %>% select("Price","WinterRain","AGST","HarvestRain","Age")
+head(wine2)
+```
+
+```{r}
+wine2 = as.data.frame(scale(wine2))
+head(wine2)
+```
+
+It seems to start flattening out at cluster 5. 
+```{r}
+set.seed(123)
+fviz_nbclust(wine2, kmeans, method = "wss")
+```
+
+The highest is at cluster 5. The consensus between the two methods is cluster 5.
+```{r}
+set.seed(123)
+fviz_nbclust(wine2, kmeans, method = "silhouette")
+```
+
+There are 5 separate groups. Cluster 4 and 5 are overlapping in some areas. The biggest cluster is cluster 3. 
+```{r}
+set.seed(1234)
+clusters3 <- kmeans(wine2, 5)
+fviz_cluster(clusters3, wine2)
+```
+
+Agglomerative Clustering
+```{r}
+m = c( "average", "single", "complete", "ward")
+names(m) = c( "average", "single", "complete", "ward")
+
+ac = function(x) {
+  agnes(wine2, method = x)$ac
+}
+map_dbl(m, ac)
+```
+
+```{r}
+hc = agnes(wine2, method = "ward") 
+pltree(hc, cex = 0.6, hang = -1, main = "Agglomerative Dendrogram") 
+```
+
+Divisive Clustering
+```{r}
+hc2 = diana(wine2)
+pltree(hc2, cex = 0.6, hang = -1, main = "Divisive Dendogram")
+```
+

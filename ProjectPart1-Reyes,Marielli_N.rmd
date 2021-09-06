@@ -1,0 +1,93 @@
+---
+output:
+  word_document: default
+  html_document: default
+---
+##Part 1 - Data Exploration, Preparation, and Visualization
+###Reyes, Marielli Nicole
+
+The packages used for this study:
+```{r}
+library(tidyverse)
+library(mice)
+library(VIM)
+```
+
+```{r}
+weather = read.csv("rain.csv")
+```
+
+The weather dataframe consists of 20 variables with 28003 observations. The variables are either factors, integer or numeric, thus no conversion were needed. 
+```{r}
+str(weather)
+```
+
+
+It is evident that there are missing values in the data. 
+```{r}
+summary(weather)
+```
+
+The following plot further shows the lack of data in the variables. It can be seen that Cloud9am and Cloud3pm variables have the most number of missing information. Column-wise and row-wise deletions are options that may be used to tackle the missing data issue. However, vital information may be lost due to these options so they were not implemented. 
+```{r}
+vim_plot = aggr(weather, numbers = TRUE, prop = c(TRUE, FALSE),cex.axis=.7)
+```
+
+To deal with the significant missing data, values were imputed and only variables deemed relevant to the study were selected. In this study, focus was directed to variables that can predict if it's going to rain tomorrow, with emphasis on the variables recorded later in the day such as the 3pm variables. 
+```{r}
+weather2 = weather %>% select(MinTemp,MaxTemp,Rainfall,WindGustDir,WindGustSpeed,Humidity3pm,Pressure3pm,Cloud3pm,RainTomorrow)
+```
+
+
+```{r}
+imp_weather = mice(weather2, m=1, method='pmm', printFlag=FALSE)
+summary(imp_weather)
+```
+
+The density plots below show that the imputed values are close to the original values.
+```{r}
+densityplot(imp_weather, ~MinTemp) 
+densityplot(imp_weather, ~MaxTemp) 
+densityplot(imp_weather, ~Rainfall) 
+densityplot(imp_weather, ~WindGustDir)
+densityplot(imp_weather, ~WindGustSpeed) 
+densityplot(imp_weather, ~Humidity3pm)
+densityplot(imp_weather, ~Pressure3pm)
+densityplot(imp_weather, ~Cloud3pm) 
+```
+
+
+After the values were imputed, a new dataframe was created containing the complete data with the selected variables. 
+```{r}
+weather_complete = complete(imp_weather) 
+summary(weather_complete)
+```
+
+Moreover, charts were produced to visualize the relationship between the variables and the response variable. 
+```{r}
+ggplot(weather_complete,aes(x=RainTomorrow, y=MinTemp)) + geom_boxplot()
+ggplot(weather_complete,aes(x=RainTomorrow, y=MaxTemp)) + geom_boxplot()
+ggplot(weather_complete,aes(x=RainTomorrow, y=Rainfall)) + geom_boxplot()
+ggplot(weather_complete,aes(x=RainTomorrow, y=WindGustSpeed)) + geom_boxplot()
+ggplot(weather_complete,aes(x=RainTomorrow, y=Humidity3pm)) + geom_boxplot() 
+ggsave("humidity.png")
+ggplot(weather_complete,aes(x=RainTomorrow, y=Pressure3pm)) + geom_boxplot()
+ggplot(weather_complete,aes(x=RainTomorrow, y=Cloud3pm)) + geom_boxplot()
+ggsave("cloud.png")
+
+ggplot(weather_complete,aes(x=WindGustDir,fill=RainTomorrow)) + 
+  geom_bar(position="fill") + theme_bw()
+t1 = table(weather_complete$RainTomorrow,weather_complete$WindGustDir)
+prop.table(t1, margin = 2)
+```
+
+Some observations from the charts:
+(1)MinTemp and MaxTemp - The higher the recorded minimum temperature, the higher chance of         rain, whereas the higher the recorded maximum temperature resulted to a higher chance        of it not raining tomorrow.  
+(2)Rainfall - This particular variable is not sufficient in predicting if it's going to            rain tomorrow. There is only a small difference between the means and significant     
+      outliers in the data are also present. 
+(3)WindGustSpeed - The higher the recorded wind gust speed, the bigger the rain probability.
+(4)Humidity3pm - The bigger the humidity percentage, the more chance of rain. 
+(5)Pressure3pm - The higher the atmospheric pressure recorded, the lesser chance of rain.
+(6)Cloud3pm - The more the sky is overcast, the higher the probability for rain tomorrow.
+(7)WindGustDir - If the direction of the strongest wind gust are N, NNW, NW, W, or WNW, there       is a higher chance of rain tomorrow. 
+(8)Aside from Rainfall, all the selected variables seem to have a decent relationship with         the response variable. However, variables Cloud3pm, Humidity3pm, and WindGustSpeed,          appear to have a stronger relationship with the RainTomorrow variable.

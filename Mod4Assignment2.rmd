@@ -1,0 +1,83 @@
+---
+editor_options:
+  chunk_output_type: console
+output:
+  word_document: default
+  html_document: default
+---
+###Module 4 - Assignment 2
+####Reyes, Marielli Nicole
+
+
+```{r}
+library(tidyverse)
+library(caret)
+library(ranger)
+```
+
+
+```{r}
+blood = read.csv("Blood.csv")
+```
+
+
+```{r}
+blood = blood %>% mutate(DonatedMarch = as_factor(as.character(DonatedMarch))) %>% 
+  mutate(DonatedMarch = fct_recode(DonatedMarch,
+  "Yes" = "1",
+  "No" = "0"))
+```
+
+
+```{r}
+set.seed(1234)
+train.rows = createDataPartition(y = blood$DonatedMarch, p=0.7, list = FALSE)
+train = blood[train.rows,] 
+test = blood[-train.rows,]
+```
+
+```{r}
+fit_control = trainControl(method = "cv",  
+                           number = 10) 
+
+set.seed(123)  
+rf_fit = train(DonatedMarch ~.,    
+                 data = train,   
+                 method = "ranger",  
+                 importance = "permutation", 
+                 num.trees = 100,
+                 trControl = fit_control)
+```
+
+
+Using varImp shows that the Total_Donated variable is the most important variable in the model, while Mnths_Since_Last is the least important. 
+```{r}
+varImp(rf_fit)
+rf_fit
+```
+
+
+Predictions on the training set were developed using the model.
+```{r}
+predRF = predict(rf_fit, train)
+head(predRF)
+```
+
+
+The resulting accuracy is 90.65%, sensitivity is 64.80% and specificity is 98.75%. Moreover, the no information rate is 76.15%. This value assumes that all observations are in the majority class. There is a significant difference between the accuracy and no information rate values. Thus, assuming that all observations fall in the majority class would not have been a wise choice. The random forest model is better than the naive model. 
+```{r}
+confusionMatrix(predRF,train$DonatedMarch, positive = "Yes")
+```
+
+
+Predictions on the testing set were developed using the model. 
+```{r}
+predRF2 = predict(rf_fit, newdata=test)
+head(predRF2)
+```
+
+Accuracy is 77.68%, sensitivity is 28.30% and specificity is 92.98%. There is a big difference between accuracy values on the training and testing sets, which implies that there might have been overfitting. The naive model value is 76.34% so the random forest model is still better than the naive model. 
+```{r}
+confusionMatrix(predRF2,test$DonatedMarch, positive = "Yes")
+```
+

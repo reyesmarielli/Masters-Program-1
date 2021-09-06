@@ -1,0 +1,329 @@
+---
+output:
+  word_document: default
+  html_document: default
+---
+##Part 2 - Model Development
+###Reyes, Marielli Nicole
+
+The packages used for part 2 of the project:
+```{r}
+library(tidyverse)
+library(mice)
+library(VIM)
+library(MASS)
+library(leaps)
+library(caret)
+library(ROCR)
+library(rpart)
+library(rattle)
+library(RColorBrewer)
+library(ranger)
+library(e1071)
+library(randomForest)
+library(nnet)
+```
+
+To deal with significant missing data, some columns were deleted and values were imputed. Only variables deemed relevant to the study were selected. In this study, focus was directed to variables that can predict if it's going to rain tomorrow, with emphasis on the variables recorded later in the day such as the 3pm variables.
+```{r}
+weather = read.csv("rain.csv")
+weather2 = weather %>% dplyr::select(-Cloud9am,-Cloud3pm,-Date)
+weather2 = weather %>% dplyr::select(RainToday,WindGustSpeed,Humidity3pm,Pressure3pm,WindGustDir,RainTomorrow)
+imp_weather = mice(weather2, m=1, method='pmm', printFlag=FALSE)
+weather_complete = complete(imp_weather) 
+```
+
+From part 1, it was inferred that the Humidity3pm and WindGustSpeed variables appear to be strong predictors of the RainTomorrow variable. 
+
+A model with the WindGustSpeed variable was created. The result show that the variable is indeed significant, given that the p-value is less than 0.05. The positive coefficient shows that as wind gust speed increases, the chance of rain also increases. AIC value is 28362.
+```{r}
+mod1 = glm(RainTomorrow ~ WindGustSpeed, weather_complete, family = "binomial")
+summary(mod1)
+```
+
+Another model was built using the WindGustSpeed variable and Humidity3pm was also added. All of the variables are significant given the corresponding p-values. Moreover, the positive coefficient of the Humidity3pm variable entail that the bigger the percentage of humidity, the bigger the chance of rain. In addition, the AIC value decreased to 21889, which means that this model is better compared to the first. 
+```{r}
+mod2 = glm(RainTomorrow ~ WindGustSpeed + Humidity3pm, weather_complete,   
+   family = "binomial")
+summary(mod2)
+```
+
+A full model was created and the results show that RainTodayYes, WindGustSpeed, Humidity3pm, Pressure3pm, WindGustDirN, WindGustDirNNW, and WindGustDirNW are all significant. The AIC generated is 20868, which is better compared to the prior models.
+```{r}
+allmod = glm(RainTomorrow ~ ., weather_complete, family =    
+    "binomial") 
+summary(allmod)  
+  
+emptymod = glm(RainTomorrow ~1, weather_complete, family = "binomial")  
+summary(emptymod)
+```
+
+
+####Backward Stepwise 
+The model created using this method generated an AIC value of 20868, which is similar to that of the full model. The models are the same. 
+```{r}
+backmod = stepAIC(allmod, direction = "backward", trace = TRUE) 
+summary(backmod)
+```
+
+####Forward Stepwise
+The forward stepwise method generated the same results, the model is the same as the backward stepwise model. 
+```{r}
+forwardmod = stepAIC(emptymod, direction = "forward", scope=list(upper=allmod,lower=emptymod),
+                      trace = TRUE) 
+summary(forwardmod) 
+```
+
+To evaluate how the model is going to perform in the real world, a simulation of unseen data was done by splitting the data into traing and testing sets.  In this project a 70:30 split was implemented. 
+```{r}
+set.seed(1234)
+train.rows = createDataPartition(y = weather_complete$RainTomorrow, p=0.7, list = FALSE) 
+train = weather_complete[train.rows,] 
+test = weather_complete[-train.rows,]
+```
+
+Charts were created using the training set. The charts show that WindGustSpeed and Humidity3pm are good predictors of the RainTomorrow variable. The higher the stated variables' values, the higher the chance of rain. On the other hand, for Pressure3pm, the higher the atmospheric pressure, the lesser chance of rain. Also, the different direction of wind gust speed produces different results. Moreover, for the RainToday variable, it is likely to rain tomorrow if rain occurred today. 
+```{r}
+ggplot(train,aes(x=RainTomorrow, y=WindGustSpeed)) + geom_boxplot()
+ggplot(train,aes(x=RainTomorrow, y=Humidity3pm)) + geom_boxplot() 
+ggplot(train,aes(x=RainTomorrow, y=Pressure3pm)) + geom_boxplot()
+ggplot(train,aes(x=RainToday,fill=RainTomorrow)) + geom_bar(position="fill") + theme_bw()
+ggplot(train,aes(x=WindGustDir,fill=RainTomorrow)) + geom_bar(position="fill") + theme_bw()
+```
+
+A model with Humidity3pm and WindGustSpeed variables were created using the training set. All of the variables are significant and the AIC generated is 15229.  
+```{r}
+mod3 = glm(RainTomorrow ~ Humidity3pm + WindGustSpeed, train, family = "binomial")
+summary(mod3)
+```
+
+In the full model created using the training set, the variables RainTodayYes, WindGustSpeed, Humidity3pm, Pressure3pm, and WindGustDirSSW are all significant. The AIC value generated is 14519, which is a better AIC value compared to the prior model.
+```{r}
+allmod2 = glm(RainTomorrow ~., train, family = "binomial") 
+summary(allmod2)  
+  
+emptymod2 = glm(RainTomorrow~1, train, family = "binomial")  
+summary(emptymod2)
+```
+
+####Backward Stepwise on the Training Set
+The model created is the same as the full model. The AIC value is also the same.
+```{r}
+backmod2 = stepAIC(allmod2, direction = "backward", trace = TRUE) 
+summary(backmod2)
+```
+
+####Forward Stepwise on the Training Set
+The model generated is the same as the backward model.
+```{r}
+forwardmod2 = stepAIC(emptymod2, direction = "forward", scope=list(upper=allmod2,lower=emptymod2), trace = TRUE) 
+summary(forwardmod2) 
+```
+
+####K-Fold Cross Validation on the Training Set
+It was recognized from the stepwise approaches that the full model, forward, and backward model generated the same results. K-fold was then applied on the training set.  
+```{r}
+ctrl = trainControl(method = "cv",number = 10) 
+
+set.seed(1234) 
+modkFold = train(RainTomorrow ~ ., train, method = "glm", trControl    = ctrl)
+summary(modkFold)
+```
+
+####Predictions on the Training set and Confusion Matrix
+The model's accuracy is 84%, sensitivity is 49%, and specificity is 94%. The model's accuracy is better than the naive set which is 78%. 
+```{r}
+predictions = predict(modkFold, type="raw")
+confusionMatrix(predictions, train$RainTomorrow, positive = "Yes")
+```
+
+####Predictions on the Testing Set and Confusion Matrix
+The model was able to perform well even on the testing set. The model's accuracy value is 83%, sensitivity is 47%, and specificity is 94%.
+```{r}
+predictions_test = predict(modkFold, newdata=test, type="raw")
+confusionMatrix(predictions_test, test$RainTomorrow, positive = "Yes")
+```
+
+###Classification Tree 
+
+The results show that the default CP value of 0.01 is the optimal CP value as this created the lowest error value. Thus, there is no need to prune the tree. 
+```{r}
+tree1 = rpart(RainTomorrow ~., train, method = "class")
+fancyRpartPlot(tree1)
+plotcp(tree1)
+printcp(tree1)
+```
+
+####Predictions on the Training Set and Confusion Matrix
+The model was able to accurately predict 14543 and 1802 values. Sensitivity is 0.41, specificity is 0.96, and accuracy is 0.83. Also, the no information rate (naive) is 0.78.
+```{r}
+treepred = predict(tree1, type = "class")
+confusionMatrix(treepred,train$RainTomorrow, positive = "Yes")
+```
+
+####Predictions on the Testing Set and Confusion Matrix
+The model was able to accurately predict 6223 and 765 values. Sensitivity is 0.41, specificity is 0.96, and accuracy is 0.83. Also, the naive rate is 0.78. The model was able to perform well even on the testing set and the accuracy value for the testing set is similar to that of the training set. This means that there is no overfitting. 
+```{r}
+treepred_test = predict(tree1, newdata = test, type = "class")
+confusionMatrix(treepred_test, test$RainTomorrow, positive = "Yes")
+```
+
+####Random Forest
+Utilizing caret's trainControl function to set up 10 fold cross-validation, a random forest model was created. 
+```{r}
+fit_control = trainControl(method = "cv",  
+                           number = 10) 
+
+set.seed(1234)  
+rf_fit = train(RainTomorrow ~.,    
+                 data = train,   
+                 method = "ranger",  
+                 trControl = fit_control)
+```
+
+
+The results show that the mtry number that generated the best accuracy value is 10. 
+```{r}
+rf_fit
+```
+
+####Predictions on the Training Set
+```{r}
+predRF = predict(rf_fit, train)
+head(predRF)
+```
+
+####Confusion Matrix
+The accuracy of the model on the training set is 0.97, sensitivity is 0.88, and specificity is 0.99. The naive rate is 0.78. The model is better than the naive set. 
+```{r}
+confusionMatrix(predRF, train$RainTomorrow, positive = "Yes")
+```
+
+####Predictions on the Testing Set
+```{r}
+predRF_test = predict(rf_fit, newdata = test)
+head(predRF_test)
+```
+
+####Confusion Matrix
+The model's accuracy value on the testing set decreased to 0.83, sensitivity is 0.47, and specificity is 0.93. The model's accuracy on the testing set decreased considerably so this may hint that the model fits the data too well. 
+```{r}
+confusionMatrix(predRF_test, test$RainTomorrow, positive = "Yes")
+```
+
+####Parameter Tuning on the Random Forest
+To address the issue of overfitting, parameter tuning was implemented.
+```{r}
+tunegrid <- expand.grid(.mtry = 1:5) 
+
+set.seed(1234)  
+rf_fit1 = train(RainTomorrow ~.,    
+                 data = train,   
+                 method = "rf",  
+                 tuneGrid = tunegrid, 
+                 trControl = fit_control)
+```
+
+```{r}
+print(rf_fit1)
+plot(rf_fit1)
+```
+
+####Predictions on the Training Set
+The model's accuracy value is 0.90, sensitivity is 0.58, and specificity is 0.99. Naive rate is 0.78.
+```{r}
+predRF1 = predict(rf_fit1, train)
+```
+```{r}
+confusionMatrix(predRF1, train$RainTomorrow, positive = "Yes")
+```
+
+####Predictions on the Testing Set
+The model generated an accuracy value of 0.84, specificity value of 0.95, and sensitivity value of 0.43. The accuracy value of the model is still better than the accuracy value of the naive model. The difference between the accuracy values of the training and testing set has improved.
+```{r}
+predRF_test1 = predict(rf_fit1, newdata = test)
+confusionMatrix(predRF_test1, test$RainTomorrow, positive = "Yes")
+```
+
+####Neural Network
+A model was created using the neural network technique. A grid size of 12 and decay rate of 0.1 was chosen to evaluate the model. 
+```{r}
+nnetGrid <-  expand.grid(size = 12, decay = 0.1)
+
+set.seed(1234)
+nnetBasic = train(RainTomorrow ~ ., 
+                 data = train,
+                 method = "nnet",
+                 tuneGrid = nnetGrid,
+                 trControl = fit_control,
+                 verbose = FALSE,
+                 trace = FALSE)
+```
+
+```{r}
+nnetBasic
+```
+
+####Predictions on the Training Set
+```{r}
+predNetBasic_train = predict(nnetBasic, train)
+head(predNetBasic_train)
+```
+
+####Confusion Matrix
+The accuracy value of the model on the training set is 0.84, sensitivity is 0.46, and specificity is 0.95.
+```{r}
+confusionMatrix(predNetBasic_train, train$RainTomorrow, positive = "Yes")
+```
+
+####Predictions on the Testing Set
+```{r}
+predNetBasic_test = predict(nnetBasic, newdata = test)
+head(predNetBasic_test)
+```
+
+####Confusion Matrix
+The accuracy value of the model on the testing set is 0.84, sensitivity is 0.46, and specificity is 0.95. 
+```{r}
+confusionMatrix(predNetBasic_test, test$RainTomorrow, positive = "Yes")
+```
+
+####Testing Different Size and Decay Rate
+```{r}
+nnetGrid2 =  expand.grid(size = seq(from = 1, to = 12, by = 1), 
+                        decay = seq(from = 0.1, to = 0.5, by = 0.1))
+set.seed(1234)
+nnetFit = train(RainTomorrow ~ ., 
+                 data=train,
+                 method = "nnet",
+                 trControl = fit_control,
+                 tuneGrid = nnetGrid2,
+                 verbose = FALSE,
+                 trace = FALSE)
+```
+
+####Predictions on the Training Set
+```{r}
+predNet_train = predict(nnetFit, train)
+head(predNet_train)
+```
+
+####Confusion Matrix
+The accuracy value is 0.84, sensitivity is 0.46, and specificity is 0.95. 
+```{r}
+confusionMatrix(predNet_train, train$RainTomorrow, positive = "Yes")
+```
+
+####Predictions on the Testing Set
+```{r}
+predNet_test = predict(nnetFit, newdata=test)
+head(predNet_test)
+```
+
+####Confusion Matrix
+The accuracy value is 0.84, sensitivity is 0.46, and specificity is 0.95.
+```{r}
+confusionMatrix(predNet_test, test$RainTomorrow, positive = "Yes")
+```
+
+Ultimately, given the multiple predictive models developed for the project, the study concluded that the best technique to predict the response variable is the random forest model. This model generated the highest accuracy value and is also the best model to deal with the overfitting issue. With parameter tuning applied on the random forest model, the overfitting issue was addressed so that it can be guaranteed that the model will perform well even with new data in the real world. Furthermore, the model's accuracy is better than the naïve set, which has an accuracy value of 0.78. Also, the five variables chosen for the model consistently demonstrated their significance given all the multiple predictive models developed utilizing them. Thus, they prove to be strong predictors of the response variable.
